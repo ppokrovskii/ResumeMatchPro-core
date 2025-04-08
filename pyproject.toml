@@ -1,0 +1,18 @@
+[project]
+name = "resumematchpro-core"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "azure-cosmos[typing]>=4.9.0",
+    "pydantic>=2.11.2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.5",
+    "pytest-asyncio>=0.26.0",
+    "pytest-cov>=6.1.1",
+    "pytest-dotenv>=0.5.2",
+]
