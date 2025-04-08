@@ -35,7 +35,7 @@ repos:
     hooks:
     -   id: run-tests
         name: Run tests with coverage
-        entry: cmd /c ".\.venv\Scripts\python -m pip install -r requirements.txt & .\.venv\Scripts\python -m pip install -e . & .\.venv\Scripts\python -m pytest tests --cov=repositories --cov=shared --cov-report=term-missing"
+        entry: uv run pytest tests --cov=repositories --cov=shared --cov-report=term-missing
         language: system
         pass_filenames: false
         always_run: true
