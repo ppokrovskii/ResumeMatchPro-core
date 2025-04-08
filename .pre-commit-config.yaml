@@ -1,6 +1,13 @@
 default_install_hook_types: [pre-commit, pre-push]
 
 repos:
+# Use uv itself as a hook so the lock file never drifts
+-   repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.6.13
+    hooks:
+    -   id: uv-lock
+    -   id: uv-export          # keeps requirements.txt fresh
+
 -   repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.5.0
     hooks:
