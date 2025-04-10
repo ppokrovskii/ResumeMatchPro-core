@@ -27,5 +27,9 @@
             "depth": 2
         }
     ],
-    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe"
+    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+    "mypy.targets": [
+        "repositories",
+        "shared"
+    ]
 }

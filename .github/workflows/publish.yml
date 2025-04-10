@@ -1,0 +1,94 @@
+name: Publish Package
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    tags:
+      - 'v*'  # Run when any tag starting with 'v' is pushed
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  # Minimalist test job that only does critical checks
+  verify:
+    name: Verify Package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for proper versioning
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine setuptools_scm wheel
+          pip install -e .
+
+      - name: Verify package builds
+        run: python -m build --sdist --wheel .
+
+      - name: Run twine check
+        run: twine check dist/*
+
+  build-and-publish:
+    name: Build and Publish Package
+    needs: verify
+    # Only run when a tag is pushed (for releases)
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for proper versioning
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine setuptools_scm wheel
+
+      - name: Determine version
+        id: version
+        run: |
+          # Use tag version
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Build package
+        run: |
+          python -m build --sdist --wheel .
+
+      - name: Run twine check
+        run: |
+          twine check dist/*
+
+      - name: Publish to GitHub Packages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Configure pip for GitHub Packages
+          echo "[distutils]" > ~/.pypirc
+          echo "index-servers = github" >> ~/.pypirc
+          echo "[github]" >> ~/.pypirc
+          echo "repository = https://maven.pkg.github.com/${{ github.repository }}" >> ~/.pypirc
+          echo "username = ${{ github.actor }}" >> ~/.pypirc
+          echo "password = ${{ secrets.GITHUB_TOKEN }}" >> ~/.pypirc
+
+          # Publish the package
+          python -m twine upload --repository github dist/*

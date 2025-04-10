@@ -1,9 +1,10 @@
 import logging
-from typing import Optional, Any
+from typing import Any
 from uuid import UUID
 
-from azure.cosmos import DatabaseProxy, PartitionKey  # type: ignore
-from azure.cosmos.exceptions import CosmosHttpResponseError  # type: ignore
+from azure.cosmos import DatabaseProxy, PartitionKey
+from azure.cosmos.exceptions import CosmosHttpResponseError
+
 from repositories.models import JobDescriptionDb
 from shared.exceptions import PermissionDeniedError
 
@@ -11,7 +12,9 @@ from shared.exceptions import PermissionDeniedError
 class JobDescriptionRepository:
     def __init__(self, db_client: DatabaseProxy):
         container_id = "job_descriptions"
-        unique_key_policy = {"uniqueKeys": [{"paths": ["/user_id", "/title", "/company"]}]}
+        unique_key_policy = {
+            "uniqueKeys": [{"paths": ["/user_id", "/title", "/company"]}]
+        }
         partition_key = PartitionKey(path="/user_id")
         self.container = db_client.create_container_if_not_exists(
             id=container_id,
@@ -48,7 +51,9 @@ class JobDescriptionRepository:
         logging.info(f"Upserted job description result: {result}")
         return JobDescriptionDb(**result)
 
-    def get_job_descriptions(self, user_id: str, is_active: Optional[bool] = None) -> list[JobDescriptionDb]:
+    def get_job_descriptions(
+        self, user_id: str, is_active: bool | None = None
+    ) -> list[JobDescriptionDb]:
         query = "SELECT * FROM c WHERE c.user_id = @user_id"
         parameters: list[dict[str, Any]] = [{"name": "@user_id", "value": user_id}]
 
@@ -66,7 +71,9 @@ class JobDescriptionRepository:
         for item in items:
             self.container.delete_item(item, partition_key=item["user_id"])
 
-    def delete_job_description(self, user_id: str, job_description_id: str | UUID) -> bool:
+    def delete_job_description(
+        self, user_id: str, job_description_id: str | UUID
+    ) -> bool:
         """Delete a job description by user_id and job_description_id."""
         if isinstance(job_description_id, UUID):
             job_description_id = str(job_description_id)
@@ -74,10 +81,14 @@ class JobDescriptionRepository:
         try:
             # First check if job description exists for any user
             query = "SELECT * FROM c WHERE c.id = @job_description_id"
-            parameters: list[dict[str, Any]] = [{"name": "@job_description_id", "value": job_description_id}]
+            parameters: list[dict[str, Any]] = [
+                {"name": "@job_description_id", "value": job_description_id}
+            ]
             items = list(
                 self.container.query_items(
-                    query, parameters=parameters, enable_cross_partition_query=True
+                    query,
+                    parameters=parameters,
+                    enable_cross_partition_query=True,
                 )
             )
             if not items:
@@ -95,7 +106,9 @@ class JobDescriptionRepository:
         except CosmosHttpResponseError as e:
             raise e
 
-    def get_job_description_by_id(self, user_id: str, job_description_id: str | UUID) -> Optional[JobDescriptionDb]:
+    def get_job_description_by_id(
+        self, user_id: str, job_description_id: str | UUID
+    ) -> JobDescriptionDb | None:
         """Get a job description by user_id and job_description_id."""
         if isinstance(job_description_id, UUID):
             job_description_id = str(job_description_id)
@@ -103,10 +116,14 @@ class JobDescriptionRepository:
         try:
             # First check if job description exists for any user
             query = "SELECT * FROM c WHERE c.id = @job_description_id"
-            parameters: list[dict[str, Any]] = [{"name": "@job_description_id", "value": job_description_id}]
+            parameters: list[dict[str, Any]] = [
+                {"name": "@job_description_id", "value": job_description_id}
+            ]
             items = list(
                 self.container.query_items(
-                    query, parameters=parameters, enable_cross_partition_query=True
+                    query,
+                    parameters=parameters,
+                    enable_cross_partition_query=True,
                 )
             )
             if not items:

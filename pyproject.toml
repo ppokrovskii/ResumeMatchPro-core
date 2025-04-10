@@ -1,18 +1,80 @@
+[build-system]
+requires = ["setuptools>=61.0", "setuptools_scm[toml]>=6.2"]
+build-backend = "setuptools.build_meta"
+
 [project]
-name = "resumematchpro-core"
+name = "resumematchpro_core"
 version = "0.1.0"
-description = "Add your description here"
+description = "Core functionality for ResumeMatchPro"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = [
-    "azure-cosmos[typing]>=4.9.0",
-    "pydantic>=2.11.2",
+license = "CC-BY-NC-4.0"
+authors = [
+    {name = "Pavel Pokrovskii"}
 ]
+dependencies = [
+    "azure-cosmos>=4.9.0",
+    "pydantic>=2.0.0",
+    "python-dotenv>=1.0.0",
+    "requests>=2.31.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "mypy>=1.8.0",
+    "ruff>=0.3.0",
+    "types-requests>=2.31.0",
+    "pre-commit>=4.2.0",
+    "twine>=6.1.0",
+    "build>=1.2.2",
+]
+
+[tool.setuptools]
+packages = ["repositories", "shared"]
+
+[tool.setuptools_scm]
+write_to = "_version.py"
+version_scheme = "post-release"
+local_scheme = "node-and-date"
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+files = ["repositories", "shared", "tests"]
+
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disallow_untyped_defs = false
+check_untyped_defs = false
+ignore_missing_imports = true
+disallow_untyped_decorators = false
+
+[[tool.mypy.overrides]]
+module = ["azure.*", "pydantic", "pytest", "dotenv"]
+ignore_missing_imports = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+select = ["E", "F", "I", "N", "W", "B", "UP", "PL", "RUF"]
+ignore = []
+
+[tool.ruff.isort]
+known-first-party = ["repositories", "shared"]
 
 [dependency-groups]
 dev = [
     "pytest>=8.3.5",
-    "pytest-asyncio>=0.26.0",
-    "pytest-cov>=6.1.1",
-    "pytest-dotenv>=0.5.2",
 ]

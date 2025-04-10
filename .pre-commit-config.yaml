@@ -36,13 +36,24 @@ repos:
     -   id: mypy
         additional_dependencies:
         - types-requests
-        args: [--config-file=mypy.ini]
+        args: [--config-file=pyproject.toml]
 
 -   repo: local
     hooks:
+    # Run quick, critical tests during pre-commit
     -   id: run-tests
         name: Run tests with coverage
-        entry: uv run pytest tests --cov=repositories --cov=shared --cov-report=term-missing
+        entry: .venv/Scripts/pytest.exe
         language: system
+        types: [python]
         pass_filenames: false
-        always_run: true
+        additional_dependencies: []
+
+    # Run package validation before pushing
+    -   id: twine-check
+        name: Twine check dist files
+        entry: .venv/Scripts/twine.exe
+        language: system
+        types: [python]
+        pass_filenames: false
+        args: [check, dist/*]

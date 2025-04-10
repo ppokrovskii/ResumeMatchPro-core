@@ -1,14 +1,17 @@
 import logging
 import sys
+from datetime import datetime
 from pathlib import Path
+from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
-from azure.cosmos.exceptions import CosmosHttpResponseError  # type: ignore
+from azure.cosmos import DatabaseProxy
+from azure.cosmos.exceptions import CosmosHttpResponseError
 from dotenv import load_dotenv
 
 from repositories.jds_repository import JobDescriptionRepository
-from repositories.models import JobDescriptionDb
+from repositories.models import JobDescription
 from shared.exceptions import PermissionDeniedError
 
 # Configure logging
@@ -21,38 +24,35 @@ load_dotenv(Path(__file__).parent / ".env.test")
 sys.path.append(str(Path(__file__).parent.parent))
 
 
-@pytest.fixture
-def repository(cosmos_client):
+@pytest.fixture(scope="function")
+def repository(cosmos_client: DatabaseProxy) -> JobDescriptionRepository:
     # Use the session-scoped cosmos_client
     return JobDescriptionRepository(cosmos_client)
 
 
 # add pytest fixture to delete all items from the container before each test
-@pytest.fixture(autouse=True)
-def run_around_tests(repository):
+@pytest.fixture(scope="function", autouse=True)
+def run_around_tests(repository: JobDescriptionRepository) -> None:
     repository.delete_all()
 
 
-@pytest.fixture
-def sample_job_description() -> JobDescriptionDb:
-    return JobDescriptionDb(
-        user_id="b3f7b3b3-3b3b-3b3b-3b3b-3b3b3b3b3b3b",
-        title="Senior Python Developer",
-        company="Tech Corp",
-        location="Remote",
-        description="Looking for a senior Python developer",
-        requirements=["5+ years of Python", "Experience with FastAPI"],
-        skills=["Python", "FastAPI", "PostgreSQL"],
-        experience_level="Senior",
-        salary_range="$100k-$150k",
-        employment_type="Full-time",
-        created_at="2024-01-01",
-        updated_at="2024-01-01",
-        is_active=True
+@pytest.fixture(scope="function")
+def sample_job_description() -> JobDescription:
+    """Fixture that provides a sample job description for testing."""
+    return JobDescription(
+        id=UUID("123e4567-e89b-12d3-a456-426614174000"),
+        title="Software Engineer",
+        company="Test Company",
+        description="Test job description",
+        requirements=["Python", "Azure"],
+        created_at=datetime(2024, 1, 1),
+        updated_at=datetime(2024, 1, 1),
     )
 
 
-def test_upsert_job_description(repository, sample_job_description):
+def test_upsert_job_description(
+    repository: JobDescriptionRepository, sample_job_description: JobDescription
+) -> None:
     # Create a sample job description
     jd = sample_job_description
 
@@ -66,7 +66,9 @@ def test_upsert_job_description(repository, sample_job_description):
     assert jds[0].company == jd.company
 
 
-def test_upsert_job_description_empty_fields(repository, sample_job_description):
+def test_upsert_job_description_empty_fields(
+    repository: JobDescriptionRepository, sample_job_description: JobDescription
+) -> None:
     # Create a sample job description with some empty fields
     jd = sample_job_description
     jd.location = None
@@ -83,7 +85,9 @@ def test_upsert_job_description_empty_fields(repository, sample_job_description)
     assert jds[0].salary_range is None
 
 
-def test_get_job_descriptions(repository, sample_job_description):
+def test_get_job_descriptions(
+    repository: JobDescriptionRepository, sample_job_description: JobDescription
+) -> None:
     # Create a sample job description
     jd = sample_job_description
 
@@ -97,13 +101,16 @@ def test_get_job_descriptions(repository, sample_job_description):
     assert jds[0].company == jd.company
 
 
-def test_get_job_descriptions_by_active_status(repository, sample_job_description):
+def test_get_job_descriptions_by_active_status(
+    repository: JobDescriptionRepository, sample_job_description: JobDescription
+) -> None:
     # Create two job descriptions - one active, one inactive
     jd_active = sample_job_description.model_copy()
     jd_inactive = sample_job_description.model_copy()
     jd_inactive.is_active = False
     jd_inactive.title = "Inactive Job"
-    jd_inactive.id = str(uuid4())  # Set a different ID for the inactive job
+    new_id = uuid4()
+    jd_inactive.id = new_id  # Set a different ID for the inactive job
 
     # Add both job descriptions to the repository
     active_dump = jd_active.model_dump(mode="json")
@@ -119,19 +126,25 @@ def test_get_job_descriptions_by_active_status(repository, sample_job_descriptio
     logging.info(f"All items in database: {all_items}")
 
     # Test getting only active job descriptions
-    active_jds = repository.get_job_descriptions(user_id=jd_active.user_id, is_active=True)
+    active_jds = repository.get_job_descriptions(
+        user_id=jd_active.user_id, is_active=True
+    )
     logging.info(f"Active JDs: {active_jds}")
     assert len(active_jds) == 1
     assert active_jds[0].title == jd_active.title
 
     # Test getting only inactive job descriptions
-    inactive_jds = repository.get_job_descriptions(user_id=jd_active.user_id, is_active=False)
+    inactive_jds = repository.get_job_descriptions(
+        user_id=jd_active.user_id, is_active=False
+    )
     logging.info(f"Inactive JDs: {inactive_jds}")
     assert len(inactive_jds) == 1
     assert inactive_jds[0].title == jd_inactive.title
 
 
-def test_delete_job_description(repository, sample_job_description):
+def test_delete_job_description(
+    repository: JobDescriptionRepository, sample_job_description: JobDescription
+) -> None:
     # Create a sample job description
     jd = sample_job_description
 
@@ -150,7 +163,9 @@ def test_delete_job_description(repository, sample_job_description):
     assert len(jds) == 0
 
 
-def test_get_job_description_by_id(repository, sample_job_description):
+def test_get_job_description_by_id(
+    repository: JobDescriptionRepository, sample_job_description: JobDescription
+) -> None:
     # Create a sample job description
     jd = sample_job_description
 
@@ -162,19 +177,27 @@ def test_get_job_description_by_id(repository, sample_job_description):
     jd_id = jds[0].id
 
     # Retrieve the job description by ID
-    retrieved_jd = repository.get_job_description_by_id(user_id=jd.user_id, job_description_id=jd_id)
+    retrieved_jd = repository.get_job_description_by_id(
+        user_id=jd.user_id, job_description_id=jd_id
+    )
     assert retrieved_jd is not None
     assert retrieved_jd.title == jd.title
     assert retrieved_jd.company == jd.company
 
 
-def test_get_job_description_by_id_not_found(repository):
+def test_get_job_description_by_id_not_found(
+    repository: JobDescriptionRepository
+) -> None:
     # Try to retrieve a non-existent job description
-    jd = repository.get_job_description_by_id(user_id=str(uuid4()), job_description_id=str(uuid4()))
+    jd = repository.get_job_description_by_id(
+        user_id=str(uuid4()), job_description_id=str(uuid4())
+    )
     assert jd is None
 
 
-def test_get_job_description_by_id_wrong_user(repository, sample_job_description):
+def test_get_job_description_by_id_wrong_user(
+    repository: JobDescriptionRepository, sample_job_description: JobDescription
+) -> None:
     # Create a sample job description
     jd = sample_job_description
 
@@ -187,19 +210,27 @@ def test_get_job_description_by_id_wrong_user(repository, sample_job_description
 
     # Try to retrieve with wrong user ID
     with pytest.raises(PermissionDeniedError):
-        repository.get_job_description_by_id(user_id=str(uuid4()), job_description_id=jd_id)
+        repository.get_job_description_by_id(
+            user_id=str(uuid4()), job_description_id=jd_id
+        )
 
 
-def test_delete_job_description_not_found(repository):
+def test_delete_job_description_not_found(
+    repository: JobDescriptionRepository
+) -> None:
     # Try to delete a non-existent job description
     result = repository.delete_job_description(
         user_id=str(uuid4()),
-        job_description_id=str(uuid4())
+        job_description_id=str(uuid4()),
     )
     assert result is False
 
 
-def test_delete_job_description_cosmos_error(repository, monkeypatch, sample_job_description):
+def test_delete_job_description_cosmos_error(
+    repository: JobDescriptionRepository,
+    monkeypatch: pytest.MonkeyPatch,
+    sample_job_description: JobDescription,
+) -> None:
     # Create a sample job description
     jd = sample_job_description
     repository.upsert_job_description(jd.model_dump(mode="json"))
@@ -207,7 +238,7 @@ def test_delete_job_description_cosmos_error(repository, monkeypatch, sample_job
     jd_id = jds[0].id
 
     # Mock the delete_item method to raise CosmosHttpResponseError
-    def mock_delete_item(*args, **kwargs):
+    def mock_delete_item(*args: Any, **kwargs: Any) -> None:
         raise CosmosHttpResponseError(message="Test error")
 
     monkeypatch.setattr(repository.container, "delete_item", mock_delete_item)
@@ -217,7 +248,11 @@ def test_delete_job_description_cosmos_error(repository, monkeypatch, sample_job
         repository.delete_job_description(user_id=jd.user_id, job_description_id=jd_id)
 
 
-def test_get_job_description_by_id_cosmos_error(repository, monkeypatch, sample_job_description):
+def test_get_job_description_by_id_cosmos_error(
+    repository: JobDescriptionRepository,
+    monkeypatch: pytest.MonkeyPatch,
+    sample_job_description: JobDescription,
+) -> None:
     # Create a sample job description
     jd = sample_job_description
     repository.upsert_job_description(jd.model_dump(mode="json"))
@@ -225,7 +260,7 @@ def test_get_job_description_by_id_cosmos_error(repository, monkeypatch, sample_
     jd_id = jds[0].id
 
     # Mock the query_items method to raise CosmosHttpResponseError
-    def mock_query_items(*args, **kwargs):
+    def mock_query_items(*args: Any, **kwargs: Any) -> None:
         raise CosmosHttpResponseError(message="Test error")
 
     monkeypatch.setattr(repository.container, "query_items", mock_query_items)
@@ -235,12 +270,16 @@ def test_get_job_description_by_id_cosmos_error(repository, monkeypatch, sample_
         repository.get_job_description_by_id(user_id=jd.user_id, job_description_id=jd_id)
 
 
-def test_upsert_job_description_cosmos_error(repository, monkeypatch, sample_job_description):
+def test_upsert_job_description_cosmos_error(
+    repository: JobDescriptionRepository,
+    monkeypatch: pytest.MonkeyPatch,
+    sample_job_description: JobDescription,
+) -> None:
     # Create a sample job description
     jd = sample_job_description
 
     # Mock the upsert_item method to raise CosmosHttpResponseError
-    def mock_upsert_item(*args, **kwargs):
+    def mock_upsert_item(*args: Any, **kwargs: Any) -> None:
         raise CosmosHttpResponseError(message="Test error")
 
     monkeypatch.setattr(repository.container, "upsert_item", mock_upsert_item)
@@ -250,7 +289,9 @@ def test_upsert_job_description_cosmos_error(repository, monkeypatch, sample_job
         repository.upsert_job_description(jd.model_dump(mode="json"))
 
 
-def test_delete_job_description_with_uuid(repository, sample_job_description):
+def test_delete_job_description_with_uuid(
+    repository: JobDescriptionRepository, sample_job_description: JobDescription
+) -> None:
     # Create a sample job description
     jd = sample_job_description
     repository.upsert_job_description(jd.model_dump(mode="json"))
@@ -269,7 +310,9 @@ def test_delete_job_description_with_uuid(repository, sample_job_description):
     assert len(jds) == 0
 
 
-def test_get_job_description_by_id_with_uuid(repository, sample_job_description):
+def test_get_job_description_by_id_with_uuid(
+    repository: JobDescriptionRepository, sample_job_description: JobDescription
+) -> None:
     # Create a sample job description
     jd = sample_job_description
     repository.upsert_job_description(jd.model_dump(mode="json"))
