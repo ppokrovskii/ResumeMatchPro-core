@@ -56,7 +56,7 @@ jobs:
       - name: Install build dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install build twine setuptools_scm wheel
+          pip install build twine setuptools_scm wheel artifacts-keyring
 
       - name: Determine version
         id: version
@@ -75,11 +75,13 @@ jobs:
         env:
           AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
         run: |
-          python -m pip config set global.extra-index-url https://pkgs.dev.azure.com/resumematchpro/resumematchpro/_packaging/resumematchpro/pypi/simple/
-          echo "[distutils]" > ~/.pypirc
-          echo "index-servers = azure" >> ~/.pypirc
-          echo "[azure]" >> ~/.pypirc
-          echo "repository = https://pkgs.dev.azure.com/resumematchpro/resumematchpro/_packaging/resumematchpro/pypi/upload" >> ~/.pypirc
-          echo "username = azure" >> ~/.pypirc
-          echo "password = ${AZURE_DEVOPS_PAT}" >> ~/.pypirc
-          python -m twine upload --repository azure dist/*
+          # Configure pip for Azure Artifacts
+          python -m pip config set global.extra-index-url https://pkgs.dev.azure.com/resumematchpro/_packaging/resumematchpro/pypi/simple/
+
+          # Configure twine for Azure Artifacts
+          export TWINE_USERNAME=azure
+          export TWINE_PASSWORD=${AZURE_DEVOPS_PAT}
+          export TWINE_REPOSITORY_URL=https://pkgs.dev.azure.com/resumematchpro/_packaging/resumematchpro/pypi/upload
+
+          # Publish the package
+          python -m twine upload --repository-url ${TWINE_REPOSITORY_URL} dist/*
