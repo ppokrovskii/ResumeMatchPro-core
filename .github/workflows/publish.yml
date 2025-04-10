@@ -10,7 +10,6 @@ on:
   workflow_dispatch:  # Allow manual triggering
 
 jobs:
-  # Minimalist test job that only does critical checks
   verify:
     name: Verify Package
     runs-on: ubuntu-latest
@@ -40,16 +39,13 @@ jobs:
   build-and-publish:
     name: Build and Publish Package
     needs: verify
-    # Only run when a tag is pushed (for releases)
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
+    environment: prod
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Fetch all history for proper versioning
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -65,30 +61,25 @@ jobs:
       - name: Determine version
         id: version
         run: |
-          # Use tag version
           VERSION=${GITHUB_REF#refs/tags/v}
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Build package
-        run: |
-          python -m build --sdist --wheel .
+        run: python -m build --sdist --wheel .
 
       - name: Run twine check
-        run: |
-          twine check dist/*
+        run: twine check dist/*
 
-      - name: Publish to GitHub Packages
+      - name: Publish to Azure Artifacts
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
         run: |
-          # Configure pip for GitHub Packages
+          python -m pip config set global.extra-index-url https://pkgs.dev.azure.com/resumematchpro/resumematchpro/_packaging/resumematchpro/pypi/simple/
           echo "[distutils]" > ~/.pypirc
-          echo "index-servers = github" >> ~/.pypirc
-          echo "[github]" >> ~/.pypirc
-          echo "repository = https://maven.pkg.github.com/${{ github.repository }}" >> ~/.pypirc
-          echo "username = ${{ github.actor }}" >> ~/.pypirc
-          echo "password = ${{ secrets.GITHUB_TOKEN }}" >> ~/.pypirc
-
-          # Publish the package
-          python -m twine upload --repository github dist/*
+          echo "index-servers = azure" >> ~/.pypirc
+          echo "[azure]" >> ~/.pypirc
+          echo "repository = https://pkgs.dev.azure.com/resumematchpro/resumematchpro/_packaging/resumematchpro/pypi/upload" >> ~/.pypirc
+          echo "username = azure" >> ~/.pypirc
+          echo "password = ${AZURE_DEVOPS_PAT}" >> ~/.pypirc
+          python -m twine upload --repository azure dist/*
